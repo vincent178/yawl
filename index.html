@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+</head>
+<body>
+
+  <input type="file" id="file-select"/>
+  
+  <script>
+
+    document.querySelector('#file-select').addEventListener('change', (e) => {
+      ws.send(e.target.files[0]);
+    }, false);
+
+    var ws = new WebSocket("ws://localhost:2345");
+    ws.addEventListener('open', function(e) {
+      ws.send("can you hear me?");
+    }, false);
+    ws.addEventListener('message', function(e) {
+      console.log(e.data);
+    }, false);
+
+  </script>
+</body>
+</html>

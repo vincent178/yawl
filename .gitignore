@@ -1,0 +1,15 @@
+
+
+# editor
+.vscode/
+
+# node
+node_modules/
+yarn-error.log
+
+# application
+tmp*
+db/
+dist/
+
+

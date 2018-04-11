@@ -1,0 +1,17 @@
+{
+  "name": "yawl",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^9.6.2",
+    "ts-node": "^5.0.1",
+    "typescript": "^2.8.1"
+  },
+  "scripts": {
+    "build:watch": "tsc -w -p .",
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+  }
+}

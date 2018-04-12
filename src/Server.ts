@@ -1,7 +1,17 @@
+import * as EventEmitter from 'events';
 import * as http from 'http';
 import * as net from 'net';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import WebSocket from './WebSocket';
+
+
+export default class Server extends EventEmitter {
+
+  constructor() {
+    super();
+  }
+}
 
 
 const server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -28,7 +38,14 @@ server.on('upgrade', (req: http.IncomingMessage, socket: net.Socket, head: Buffe
 
   socket.on('data', buf => {
     ws.onData(buf)
-    ws.send("Hello there");
+    fs.readFile('/Users/i312714/Downloads/2018-02-07_14-03-03.mp4', (err, data) => {
+      if (err) {
+        throw err;
+      }
+      console.log(data.length);
+      // ws.send('hello world');
+      ws.send(data);
+    });
   });
 });
 

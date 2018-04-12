@@ -1,7 +1,29 @@
 import * as EventEmitter from 'events';
 import * as net from 'net';
-import * as fs from 'fs';
 
+/* 
+ *   WebSocket Framing Protocol
+ * 
+ *       0                   1                   2                   3
+ *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *   +-+-+-+-+-------+-+-------------+-------------------------------+
+ *   |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+ *   |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+ *   |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+ *   | |1|2|3|       |K|             |                               |
+ *   +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+ *   |     Extended payload length continued, if payload len == 127  |
+ *   + - - - - - - - - - - - - - - - +-------------------------------+
+ *   |                               |Masking-key, if MASK set to 1  |
+ *   +-------------------------------+-------------------------------+
+ *   | Masking-key (continued)       |          Payload Data         |
+ *   +-------------------------------- - - - - - - - - - - - - - - - +
+ *   :                     Payload Data continued ...                :
+ *   + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+ *   |                     Payload Data continued ...                |
+ *   +---------------------------------------------------------------+
+ * 
+ */
 export default class WebSocket extends EventEmitter {
 
   private _socket: net.Socket;
@@ -10,38 +32,62 @@ export default class WebSocket extends EventEmitter {
   private _message: string|Buffer;
   private _maskingKey: Buffer;
   private _payloadLen: number;
-  private _hasMore: boolean;
+  private _fin: boolean;
+  private _fragments: Buffer[];
 
   constructor(socket: net.Socket, head: Buffer) {
     super();
     this._socket = socket;
     this._head = head;
-    this._hasMore = false;
+    this.resetAll();
   }
 
-  onData(buf: Buffer) {
-   this._buffers = this._buffers ? Buffer.concat([this._buffers, buf]) : buf;
+  send(data: string|Buffer, options: {fin: boolean, mask: boolean} = {fin: true, mask: false}) {
+    let opcode = 0;
+    if (typeof data === 'string') {
+      opcode = 1;
+    } else if (Buffer.isBuffer(data)) {
+      opcode = 2;
+    }
 
-    if (!this._hasMore) {
+    const finfo = Buffer.allocUnsafe(2);
+    finfo[0] = ((options.fin ? 1 : 0) << 7) + opcode;
+    let len = data.length;
+    let extendPayloadLength;
+
+    if (len >= 65536) {
+      extendPayloadLength = Buffer.allocUnsafe(8);
+      extendPayloadLength.writeUInt32BE(~~(len / 0xffffffff), 0);
+      extendPayloadLength.writeUInt32BE(len & 0x00000000ffffffff, 4);
+      len = 127;
+    } else if (len > 125) {
+      extendPayloadLength = Buffer.allocUnsafe(2);
+      extendPayloadLength.writeUInt16BE(len, 0);
+      len = 126;
+    } 
+
+    finfo[1] = len;
+    data = Buffer.from(data as any);
+    const ret = extendPayloadLength ? [finfo, extendPayloadLength, data] : [finfo, data];
+    this._socket.write(Buffer.concat(ret as any));
+  }
+
+
+  onData(buf: Buffer) {
+    this._buffers = this._buffers ? Buffer.concat([this._buffers, buf]) : buf;
+
+    if (this._payloadLen === 0) {
       this.getInfo();
     }
 
     this.getData();
   }
 
-  getInfo() {
+  private getInfo() {
     const buf = this.consume(2);
 
-    const fin = (buf[0] & 0x80) === 0x80;
+    this._fin = (buf[0] & 0x80) === 0x80;
     const opcode = buf[0] & 0x0f;
-
-    if (opcode === 1) {
-      console.log("text message");
-    } else if (opcode === 2) {
-      console.log("binary message");
-    } else {
-      console.log(opcode);
-    }
 
     const mask = (buf[1] & 0x80) === 0x80;
     this._payloadLen = buf[1] & 0x7f;
@@ -62,9 +108,8 @@ export default class WebSocket extends EventEmitter {
     }
   }
 
-  getData() {
+  private getData() {
     if (this._payloadLen > this._buffers.length) {
-      this._hasMore = true;
       return;
     }
 
@@ -73,29 +118,34 @@ export default class WebSocket extends EventEmitter {
       this._message = this._message.map((p, i) => p ^ (this._maskingKey as Buffer)[i%4]) as Buffer;
     } 
 
-    if (this._payloadLen > 100) {
-      fs.writeFile('tmp.jpg', this._message, () => {
-        console.log('write to file successfully');
-      });
+    if (!this._fin) {
+      this._fragments.push(this._message);
+      this.reset();
+      return;
     }
+
+    this.emit('message', Buffer.concat(this._fragments));
+    this.resetAll();
   }
 
-  consume(n: number) {
+  private consume(n: number) {
     if (n > this._buffers.length) {
-      this._buffers = Buffer.allocUnsafe(0);
-      return this._buffers;
+      this._buffers = null as any;
+      throw new RangeError('Invalid WebSocket Frame Consume');
     }
     const ret = this._buffers.slice(0, n);
     this._buffers = this._buffers.slice(n);
     return ret;
   }
 
-  send(data: string|Buffer) {
-    const text = Buffer.from(data as any);
-    const finfo = Buffer.allocUnsafe(2);
-    finfo[0] = 0b10000001;
-    finfo[1] = text.length;
-    const ret = Buffer.concat([finfo, text]);
-    this._socket.write(ret);
+  private resetAll() {
+    this._fragments = [];
+    this.reset();
+  }
+
+  private reset() {
+    this._payloadLen = 0;
+    this._fin = false;
+    this._message = null as any;
   }
 }

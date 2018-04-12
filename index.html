@@ -20,6 +20,7 @@
     ws.addEventListener('open', function(e) {
       ws.send("can you hear me?");
     }, false);
+
     ws.addEventListener('message', function(e) {
       console.log(e.data);
     }, false);

@@ -43,6 +43,9 @@ export default class Server extends EventEmitter {
     this._server.on('upgrade', this.onUpgrade.bind(this));
   }
 
+  close() {
+  }
+
   private onUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer) {
     this.handShake(req, socket);
     const ws = new WebSocket(socket, head);

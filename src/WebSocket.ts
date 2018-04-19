@@ -128,8 +128,9 @@ export default class WebSocket extends EventEmitter {
       this._message = this._message.map((p, i) => p ^ (this._maskingKey as Buffer)[i%4]) as Buffer;
     } 
 
+    this._fragments.push(this._message);
+
     if (!this._fin) {
-      this._fragments.push(this._message);
       this.reset();
       return;
     }

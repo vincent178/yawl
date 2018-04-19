@@ -8,6 +8,7 @@ class Server extends EventEmitter {
     const req = {
       headers: {}
     };
+    socket.id = Math.floor(Math.random() * 100); 
     this.emit('upgrade', req, socket);
     return socket;
   }

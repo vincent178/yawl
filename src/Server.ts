@@ -18,7 +18,11 @@ export type IServerOptions = {
 }
 
 /*
- * TODO: <v1.0> websocket extensions
+ *  WebSocket Server class
+ *    * handle upgrade request
+ *    * receive data frame
+ * 
+ *  TODO: <v1.0> websocket extensions
  */
 export default class Server extends EventEmitter {
 
@@ -50,14 +54,11 @@ export default class Server extends EventEmitter {
     this._server.on('upgrade', this.onUpgrade.bind(this));
   }
 
-  close() {
-  }
-
   private onUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer) {
 
     if (
       req.method === "GET" && 
-      parseFloat(req.httpVersion) >= 1.1 && 
+      +req.httpVersion >= 1.1 && 
       req.headers.host && 
       req.headers.upgrade && 
       req.headers.origin && // if request coming from browser, this feild is required
@@ -66,12 +67,15 @@ export default class Server extends EventEmitter {
       req.headers['sec-websocket-key'] && 
       req.headers['sec-websocket-version'] === '13'
     ) {
+
       this.handShake(req, socket);
       const ws = new WebSocket(socket, head);
       this.emit('connection', ws);
       socket.on('data', buf => ws.onData(buf));
+      ws.on('error', () => {
+      });
     } else if (req.headers['sec-websocket-version'] !== '13') {
-      this.abortHandShake(socket, 426);
+      this.abortHandShake(socket, 400, 'Sec-WebSocket-Version: 13');
     } else {
       this.abortHandShake(socket, 400);
     }
@@ -90,13 +94,13 @@ export default class Server extends EventEmitter {
     );
   }
 
-  private abortHandShake(socket: net.Socket, code: number) {
+  private abortHandShake(socket: net.Socket, code: number, data?: string) {
     socket.write(
       `HTTP/1.1 ${code} ${http.STATUS_CODES[code]}\r\n` +
       'Connection: close\r\n' +
       'Content-type: text/html\r\n' +
+      data ? `${data}\r\n` : null + 
       '\r\n'
     );
   }
-
 }

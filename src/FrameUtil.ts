@@ -1,5 +1,3 @@
-import Frame from "./Frame";
-
 export default class FrameUtil {
 
   static build(options: {fin: boolean, opcode: number, mask: boolean, data: string|Buffer}): Buffer {

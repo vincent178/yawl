@@ -1,10 +1,13 @@
 import * as EventEmitter from 'events';
 import * as net from 'net';
-import { debug } from 'util';
 
 /* 
- *  WebSocket Framing Protocol
  * 
+ *  WebScoket class
+ *    * parse data frame to message
+ *    * build server send data frame 
+ * 
+ *  WebSocket Framing Protocol
  *      0                   1                   2                   3
  *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  *  +-+-+-+-+-------+-+-------------+-------------------------------+
@@ -24,7 +27,6 @@ import { debug } from 'util';
  *  |                     Payload Data continued ...                |
  *  +---------------------------------------------------------------+
  * 
- *  WebScoket class is a generic class responsible to receive/send message in both client/server
  *  TODO: <v1.0> refactor to universal purpose
  *  TODO: <v1.0> different packages for client and server and universal
  */
@@ -44,12 +46,6 @@ export default class WebSocket extends EventEmitter {
     this._socket = socket;
     this._head = head;
     this.resetAll();
-  }
-
-  ping() {
-  }
-
-  pong() {
   }
 
   send(data: string|Buffer, options: {fin: boolean, mask: boolean} = {fin: true, mask: false}) {
@@ -84,24 +80,49 @@ export default class WebSocket extends EventEmitter {
 
 
   onData(buf: Buffer) {
-    this._buffers = this._buffers ? Buffer.concat([this._buffers, buf]) : buf;
-
-    if (this._payloadLen === 0) {
-      this.getInfo();
+    try {
+      this._buffers = this._buffers ? Buffer.concat([this._buffers, buf]) : buf;
+      // socket has buffer, so it might continue the last data frame or receive a new data frame
+      if (this._payloadLen === 0) {
+        this.getInfo();
+      }
+      this.getData();
+    } catch(e) {
     }
-
-    this.getData();
   }
 
   getInfo() {
     const buf = this.consume(2);
 
+    // indicate finnal fragment in a message
     this._fin = (buf[0] & 0x80) === 0x80;
+
+    const rsv1 = (buf[0] & 0x40) === 0x40;
+    const rsv2 = (buf[0] & 0x20) === 0x20;
+    const rsv3 = (buf[0] & 0x10) === 0x10;
+    if (rsv1 === true || rsv2 === true || rsv3 === true) {
+      throw new WebSocketError(0);
+    }
+
+    // interpretation of the payload data
+    // 0 continuation frame 
+    // 1 text frame
+    // 2 binary frame
+    // 8 close frame
+    // 9 ping frame
+    // 10 pong frame
     const opcode = buf[0] & 0x0f;
+    if (this._fin === false && (opcode >= 8)) {
+      throw new WebSocketError(1);
+    }
 
+    // masked message flag 
     const mask = (buf[1] & 0x80) === 0x80;
-    this._payloadLen = buf[1] & 0x7f;
+    if (!mask) {
+      throw new WebSocketError(2);
+    }
 
+    this._payloadLen = buf[1] & 0x7f;
     if (this._payloadLen === 126) {
       this._payloadLen = this.consume(2).readUInt16BE(0);
     } else if (this._payloadLen === 127) {
@@ -164,3 +185,19 @@ export default class WebSocket extends EventEmitter {
     return this._buffers;
   }
 }
+
+/*
+ * 0 -> rsv non-zero error
+ * 1 -> control fragmented error
+ * 2 -> unmask error
+ */
+class WebSocketError extends Error {
+
+  public code: number;
+
+  constructor(code: number) {
+    super();
+    this.code = code;
+    Error.captureStackTrace(this, WebSocketError)
+  }
+};

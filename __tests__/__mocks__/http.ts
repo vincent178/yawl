@@ -6,9 +6,17 @@ class Server extends EventEmitter {
   emitUpgrade() {
     const socket = new net.Socket()
     const req = {
-      headers: {}
+      method: 'GET',
+      httpVersion: '1.1',
+      headers: {
+        host: 'test.com',
+        upgrade: 'websocket',
+        connection: 'Upgrade',
+        origin: 'test.com',
+        'sec-websocket-key': '123',
+        'sec-websocket-version': '13'
+      }
     };
-    socket.id = Math.floor(Math.random() * 100); 
     this.emit('upgrade', req, socket);
     return socket;
   }

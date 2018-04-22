@@ -61,9 +61,9 @@ export default class Server extends EventEmitter {
       +req.httpVersion >= 1.1 && 
       req.headers.host && 
       req.headers.upgrade && 
-      req.headers.origin && // if request coming from browser, this feild is required
       /websocket/.test(req.headers.upgrade) && 
       /Upgrade/.test(<any>req.headers.connection) &&
+      req.headers.origin && // if request coming from browser, this feild is required
       req.headers['sec-websocket-key'] && 
       req.headers['sec-websocket-version'] === '13'
     ) {

@@ -4,7 +4,8 @@ const net = <any>jest.genMockFromModule('net');
 function noop() {};
 class Socket extends EventEmitter {
 
-  write = noop;
+  write() {
+  };
 
   send(message) {
     this.emit('data', message);

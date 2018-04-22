@@ -1,6 +1,7 @@
 import * as EventEmitter from 'events';
 import * as net from 'net';
 import FrameSender from './FrameSender';
+import FrameUtil from './FrameUtil';
 
 /* 
  * 
@@ -79,6 +80,7 @@ export default class WebSocket extends EventEmitter {
       }
       this.getData();
     } catch(e) {
+      console.log(e);
     }
   }
 
@@ -137,7 +139,7 @@ export default class WebSocket extends EventEmitter {
 
     this._message = this.consume(this._payloadLen);
     if (this._maskingKey) {
-      this._message = this._message.map((p, i) => p ^ (this._maskingKey as Buffer)[i%4]) as Buffer;
+      this._message = FrameUtil.maskOrUnmask(this._maskingKey, this._message);
     } 
 
     this._fragments.push(this._message);

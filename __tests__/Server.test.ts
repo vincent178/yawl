@@ -1,6 +1,6 @@
 import Server from '../src/Server';
 import http from './__mocks__/http';
-import FrameSender from '../src/FrameSender';
+import FrameUtil from '../src/FrameUtil';
 
 describe('Server receive message', () => {
   test('receive text message', () => {
@@ -14,9 +14,14 @@ describe('Server receive message', () => {
 
 
     const socket = server.emitUpgrade();
-    const sender = new FrameSender(socket);
     const msg = "Hello world";
-    sender.send(msg);
+    const buf = FrameUtil.build({
+      data: msg,
+      fin: true,
+      opcode: 1,
+      mask: true
+    });
+    socket.send(buf);
   });
 
   test('receive binary message', () => {
@@ -30,8 +35,13 @@ describe('Server receive message', () => {
 
     const socket = server.emitUpgrade();
     const binary = Buffer.from('binary');
-    const sender = new FrameSender(socket);
-    sender.send(binary);
+    const buf = FrameUtil.build({
+      data: binary,
+      fin: true,
+      opcode: 2,
+      mask: true
+    })
+    socket.send(buf);
   });
 });
 

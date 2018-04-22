@@ -25,6 +25,12 @@ export default class FrameUtil {
     return Buffer.concat(ret);
   }
 
+  static sendText() {
+  }
+
+  static sendBinary() {
+  }
+
   static mask() {
   }
 

@@ -2,8 +2,6 @@ import Server from '../src/Server';
 import http from './__mocks__/http';
 import FrameUtil from '../src/FrameUtil';
 
-
-
 describe('Server receive message', () => {
   test('receive text message', () => {
     const server = new http.Server();

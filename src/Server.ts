@@ -7,17 +7,24 @@ import WebSocket from './WebSocket';
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 export type IServerOptions = {
+  // custom server
   server?: http.Server;
+
+  // simple built in server
   port?: number;
   host?: string;
   backlog?: number;
+  callback?: Function;
 }
 
+/*
+ * TODO: <v1.0> websocket extensions
+ */
 export default class Server extends EventEmitter {
 
   private _server: http.Server;
 
-  constructor(options: IServerOptions, callback?: Function) {
+  constructor(options: IServerOptions) {
     super();
 
     if (!options.port && !options.server) {
@@ -33,7 +40,7 @@ export default class Server extends EventEmitter {
         });
         res.end(body);
       });
-      this._server.listen(options.port, options.host, options.backlog, callback);
+      this._server.listen(options.port, options.host, options.backlog, options.callback);
     } 
 
     if (options.server) {
@@ -47,10 +54,27 @@ export default class Server extends EventEmitter {
   }
 
   private onUpgrade(req: http.IncomingMessage, socket: net.Socket, head: Buffer) {
-    this.handShake(req, socket);
-    const ws = new WebSocket(socket, head);
-    this.emit('connection', ws);
-    socket.on('data', buf => ws.onData(buf));
+
+    if (
+      req.method === "GET" && 
+      parseFloat(req.httpVersion) >= 1.1 && 
+      req.headers.host && 
+      req.headers.upgrade && 
+      req.headers.origin && // if request coming from browser, this feild is required
+      /websocket/.test(req.headers.upgrade) && 
+      /Upgrade/.test(<any>req.headers.connection) &&
+      req.headers['sec-websocket-key'] && 
+      req.headers['sec-websocket-version'] === '13'
+    ) {
+      this.handShake(req, socket);
+      const ws = new WebSocket(socket, head);
+      this.emit('connection', ws);
+      socket.on('data', buf => ws.onData(buf));
+    } else if (req.headers['sec-websocket-version'] !== '13') {
+      this.abortHandShake(socket, 426);
+    } else {
+      this.abortHandShake(socket, 400);
+    }
   }
 
   private handShake(req: http.IncomingMessage, socket: net.Socket) {
@@ -65,4 +89,14 @@ export default class Server extends EventEmitter {
       '\r\n'
     );
   }
+
+  private abortHandShake(socket: net.Socket, code: number) {
+    socket.write(
+      `HTTP/1.1 ${code} ${http.STATUS_CODES[code]}\r\n` +
+      'Connection: close\r\n' +
+      'Content-type: text/html\r\n' +
+      '\r\n'
+    );
+  }
+
 }

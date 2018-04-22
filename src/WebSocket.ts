@@ -1,5 +1,6 @@
 import * as EventEmitter from 'events';
 import * as net from 'net';
+import FrameSender from './FrameSender';
 
 /* 
  * 
@@ -39,43 +40,33 @@ export default class WebSocket extends EventEmitter {
   private _maskingKey: Buffer;
   private _payloadLen: number;
   private _fin: boolean;
+  private _opcode: number;
   private _fragments: Buffer[];
+  private _sender: FrameSender;
 
   constructor(socket: net.Socket, head: Buffer) {
     super();
     this._socket = socket;
     this._head = head;
     this.resetAll();
+    this._sender = new FrameSender(socket);
   }
 
-  send(data: string|Buffer, options: {fin: boolean, mask: boolean} = {fin: true, mask: false}) {
-    let opcode = 0;
-    if (typeof data === 'string') {
-      opcode = 1;
-    } else if (Buffer.isBuffer(data)) {
-      opcode = 2;
-    }
+  send(data: string|Buffer) {
+    this._sender.send(data);
+  }
 
-    const finfo = Buffer.allocUnsafe(2);
-    finfo[0] = ((options.fin ? 1 : 0) << 7) + opcode;
-    let len = data.length;
-    let extendPayloadLength;
+  ping(data?: string|Buffer) {
+    this._sender.ping(data);
+  }
 
-    if (len >= 65536) {
-      extendPayloadLength = Buffer.allocUnsafe(8);
-      extendPayloadLength.writeUInt32BE(~~(len / 0xffffffff), 0);
-      extendPayloadLength.writeUInt32BE(len & 0x00000000ffffffff, 4);
-      len = 127;
-    } else if (len > 125) {
-      extendPayloadLength = Buffer.allocUnsafe(2);
-      extendPayloadLength.writeUInt16BE(len, 0);
-      len = 126;
-    } 
+  pong(data?: string|Buffer) {
+    this._sender.pong(data);
+  }
 
-    finfo[1] = len;
-    data = Buffer.from(data as any);
-    const ret = extendPayloadLength ? [finfo, extendPayloadLength, data] : [finfo, data];
-    this._socket.write(Buffer.concat(ret as any));
+  // send close frame
+  close(code?: number, reason?: string) {
+    this._sender.close(code, reason);
   }
 
 
@@ -111,8 +102,8 @@ export default class WebSocket extends EventEmitter {
     // 8 close frame
     // 9 ping frame
     // 10 pong frame
-    const opcode = buf[0] & 0x0f;
-    if (this._fin === false && (opcode >= 8)) {
+    this._opcode = buf[0] & 0x0f;
+    if (this._fin === false && (this._opcode >= 8)) {
       throw new WebSocketError(1);
     }
 
@@ -156,7 +147,13 @@ export default class WebSocket extends EventEmitter {
       return;
     }
 
-    this.emit('message', Buffer.concat(this._fragments));
+    const fragments = Buffer.concat(this._fragments);
+    if (this._opcode === 1) {
+      this.emit('message', fragments.toString());
+    } else {
+      this.emit('message', fragments);
+    }
+
     this.resetAll();
   }
 

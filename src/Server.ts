@@ -32,7 +32,7 @@ export default class Server extends EventEmitter {
     super();
 
     if (!options.port && !options.server) {
-      throw new TypeError('One of "port" or "server" options must be specified');
+      throw new TypeError('one of "port" or "server" options must be specified');
     }
 
     if (options.port) {

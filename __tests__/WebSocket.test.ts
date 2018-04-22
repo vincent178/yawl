@@ -20,6 +20,4 @@ test('WebSocket consume', () => {
 test('WebSocket getInfo', () => {
   const data = 'Hello world';
   ws['_buffers'] = Buffer.from(data);
-
-
 });

@@ -1,4 +1,4 @@
-import Util from '../src/FrameUtil';
+import Util from '../src/Util';
 
 describe('FrameUtil test', () => {
   test('can mask and unmask message', () => {

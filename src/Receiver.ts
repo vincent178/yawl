@@ -1,5 +1,5 @@
 import * as stream from 'stream';
-import Util from './FrameUtil';
+import Util from './Util';
 
 export default class Receiver extends stream.Writable {
 

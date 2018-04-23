@@ -72,7 +72,6 @@ export default class Server extends EventEmitter {
       this.handShake(req, socket);
       const ws = new WebSocket(socket, head);
       this.emit('connection', ws);
-      socket.on('data', buf => ws.onData(buf));
 
     } else if (req.headers['sec-websocket-version'] !== '13') {
       this.abortHandShake(socket, 400, 'Sec-WebSocket-Version: 13');

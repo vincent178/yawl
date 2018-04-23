@@ -1,5 +1,5 @@
 import * as net from 'net';
-import Util from './FrameUtil';
+import Util from './Util';
 
 /*
  * FrameBuilder class
@@ -57,6 +57,6 @@ export default class Sender {
 
   // generic method to build frame
   private _send(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean}) {
-    this._socket.write(Util.build(options));
+    this._socket.write(Util.frame(options));
   }
 }

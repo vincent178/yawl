@@ -4,30 +4,9 @@ import Sender from './Sender';
 import Receiver from './Receiver';
 
 /* 
- * 
  *  WebSocket class
  *    * parse data frame to message
  *    * build server send data frame 
- * 
- *  WebSocket Framing Protocol
- *      0                   1                   2                   3
- *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *  +-+-+-+-+-------+-+-------------+-------------------------------+
- *  |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
- *  |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
- *  |N|V|V|V|       |S|             |   (if payload len==126/127)   |
- *  | |1|2|3|       |K|             |                               |
- *  +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
- *  |     Extended payload length continued, if payload len == 127  |
- *  + - - - - - - - - - - - - - - - +-------------------------------+
- *  |                               |Masking-key, if MASK set to 1  |
- *  +-------------------------------+-------------------------------+
- *  | Masking-key (continued)       |          Payload Data         |
- *  +-------------------------------- - - - - - - - - - - - - - - - +
- *  :                     Payload Data continued ...                :
- *  + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
- *  |                     Payload Data continued ...                |
- *  +---------------------------------------------------------------+
  * 
  *  TODO: <v1.0> refactor to universal purpose
  *  TODO: <v1.0> different packages for client and server and universal
@@ -46,11 +25,16 @@ export default class WebSocket extends EventEmitter {
     this._sender = new Sender(socket);
     this._receiver = new Receiver();
 
+    this._receiver.on('message', (message) => this.receiverOnMessage(message));
+    this._receiver.on('ping', () => this.receiverOnPing());
+    this._receiver.on('pong', () => this.receiverOnPong());
+    this._receiver.on('conclude', () => this.receiverOnConclude());
+    this._receiver.on('drain', () => this.receiverOnDrain());
 
-    this._receiver.on('message', (message) => {
-      this.emit('message', message);
-    });
-
+    this._socket.on('close', () => this.socketOnClose());
+    this._socket.on('data', (buf) => this.socketOnData(buf));
+    this._socket.on('end', () => this.socketOnEnd());
+    this._socket.on('error', () => this.socketOnError());
   }
 
   send(data: string|Buffer) {
@@ -69,9 +53,34 @@ export default class WebSocket extends EventEmitter {
     this._sender.close(code, reason);
   }
 
-  onData(buf: Buffer) {
+  private receiverOnConclude() {
+  }
+
+  private receiverOnDrain() {
+  }
+
+  private receiverOnMessage(message: Buffer|string) {
+    this.emit('message', message);
+  }
+
+  private receiverOnPing() {
+  }
+
+  private receiverOnPong() {
+  }
+
+  private socketOnClose() {
+  }
+
+  private socketOnData(buf: Buffer) {
     if (!this._receiver.write(buf)) {
       this._socket.pause();
     }
+  }
+
+  private socketOnEnd() {
+  }
+
+  private socketOnError() {
   }
 }

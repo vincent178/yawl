@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 
 export default class Util {
 
-  static build(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean}) {
+  static frame(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean}) {
     const finfo = Buffer.allocUnsafe(2);
     finfo[0] = (options.fin ? 0x80 : 0x00) + options.opcode;
     let len = options.data ? options.data.length : 0;

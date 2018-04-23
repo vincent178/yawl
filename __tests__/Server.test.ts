@@ -1,7 +1,7 @@
 import * as sinon from 'sinon';
 import Server from '../src/Server';
 import http from './__mocks__/http';
-import FrameUtil from '../src/FrameUtil';
+import Util from '../src/Util';
 
 describe('Server receive message', () => {
   test('receive text message', () => {
@@ -19,7 +19,7 @@ describe('Server receive message', () => {
 
     const socket = server.emitUpgrade();
     const msg = "Hello world";
-    const buf = FrameUtil.build({
+    const buf = Util.frame({
       data: msg,
       fin: true,
       opcode: 1,
@@ -43,7 +43,7 @@ describe('Server receive message', () => {
 
     const socket = server.emitUpgrade();
     const binary = Buffer.from('binary');
-    const buf = FrameUtil.build({
+    const buf = Util.frame({
       data: binary,
       fin: true,
       opcode: 2,

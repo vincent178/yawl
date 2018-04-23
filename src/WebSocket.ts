@@ -1,11 +1,11 @@
 import * as EventEmitter from 'events';
 import * as net from 'net';
-import FrameSender from './FrameSender';
-import FrameUtil from './FrameUtil';
+import Sender from './Sender';
+import Receiver from './Receiver';
 
 /* 
  * 
- *  WebScoket class
+ *  WebSocket class
  *    * parse data frame to message
  *    * build server send data frame 
  * 
@@ -36,21 +36,21 @@ export default class WebSocket extends EventEmitter {
 
   private _socket: net.Socket;
   private _head: Buffer;
-  private _buffers: Buffer;
-  private _message: string|Buffer;
-  private _maskingKey: Buffer;
-  private _payloadLen: number;
-  private _fin: boolean;
-  private _opcode: number;
-  private _fragments: Buffer[];
-  private _sender: FrameSender;
+  private _sender: Sender;
+  private _receiver: Receiver;
 
   constructor(socket: net.Socket, head: Buffer) {
     super();
     this._socket = socket;
     this._head = head;
-    this.resetAll();
-    this._sender = new FrameSender(socket);
+    this._sender = new Sender(socket);
+    this._receiver = new Receiver();
+
+
+    this._receiver.on('message', (message) => {
+      this.emit('message', message);
+    });
+
   }
 
   send(data: string|Buffer) {
@@ -65,138 +65,13 @@ export default class WebSocket extends EventEmitter {
     this._sender.pong(data);
   }
 
-  // send close frame
   close(code?: number, reason?: string) {
     this._sender.close(code, reason);
   }
 
-
   onData(buf: Buffer) {
-    try {
-      this._buffers = this._buffers ? Buffer.concat([this._buffers, buf]) : buf;
-      // socket has buffer, so it might continue the last data frame or receive a new data frame
-      if (this._payloadLen === 0) {
-        this.getInfo();
-      }
-      this.getData();
-    } catch(e) {
-      console.log(e);
+    if (!this._receiver.write(buf)) {
+      this._socket.pause();
     }
-  }
-
-  getInfo() {
-    const buf = this.consume(2);
-
-    // indicate finnal fragment in a message
-    this._fin = (buf[0] & 0x80) === 0x80;
-
-    const rsv1 = (buf[0] & 0x40) === 0x40;
-    const rsv2 = (buf[0] & 0x20) === 0x20;
-    const rsv3 = (buf[0] & 0x10) === 0x10;
-    if (rsv1 === true || rsv2 === true || rsv3 === true) {
-      throw new WebSocketError(0);
-    }
-
-    // interpretation of the payload data
-    // 0 continuation frame 
-    // 1 text frame
-    // 2 binary frame
-    // 8 close frame
-    // 9 ping frame
-    // 10 pong frame
-    this._opcode = buf[0] & 0x0f;
-    if (this._fin === false && (this._opcode >= 8)) {
-      throw new WebSocketError(1);
-    }
-
-    // masked message flag 
-    const mask = (buf[1] & 0x80) === 0x80;
-    if (!mask) {
-      throw new WebSocketError(2);
-    }
-
-    this._payloadLen = buf[1] & 0x7f;
-    if (this._payloadLen === 126) {
-      this._payloadLen = this.consume(2).readUInt16BE(0);
-    } else if (this._payloadLen === 127) {
-      const buf = this.consume(8);
-      const n = buf.readUInt32BE(0);
-      this._payloadLen = n * Math.pow(2, 32) + buf.readUInt32BE(4);
-      if (this._payloadLen > Number.MAX_SAFE_INTEGER) {
-        throw new RangeError(`Invalid WebSocket Frame: payload length is greater than ${Number.MAX_SAFE_INTEGER}`);
-      }
-    } 
-
-    if (mask) {
-      this._maskingKey = this.consume(4);
-    }
-  }
-
-  getData() {
-    if (this._payloadLen > this._buffers.length) {
-      return;
-    }
-
-    this._message = this.consume(this._payloadLen);
-    if (this._maskingKey) {
-      this._message = FrameUtil.maskOrUnmask(this._maskingKey, this._message);
-    } 
-
-    this._fragments.push(this._message);
-
-    if (!this._fin) {
-      this.reset();
-      return;
-    }
-
-    const fragments = Buffer.concat(this._fragments);
-    if (this._opcode === 1) {
-      this.emit('message', fragments.toString());
-    } else {
-      this.emit('message', fragments);
-    }
-
-    this.resetAll();
-  }
-
-  consume(n: number) {
-    if (n > this._buffers.length) {
-      this._buffers = null as any;
-      throw new RangeError('Invalid WebSocket Frame Consume');
-    }
-    const ret = this._buffers.slice(0, n);
-    this._buffers = this._buffers.slice(n);
-    return ret;
-  }
-
-  private resetAll() {
-    this._fragments = [];
-    this.reset();
-  }
-
-  private reset() {
-    this._payloadLen = 0;
-    this._fin = false;
-    this._message = null as any;
-  }
-
-  get buffers() {
-    return this._buffers;
   }
 }
-
-/*
- * 0 -> rsv non-zero error
- * 1 -> control fragmented error
- * 2 -> unmask error
- */
-class WebSocketError extends Error {
-
-  public code: number;
-
-  constructor(code: number) {
-    super();
-    this.code = code;
-    Error.captureStackTrace(this, WebSocketError)
-  }
-};

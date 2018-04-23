@@ -1,13 +1,17 @@
+import * as sinon from 'sinon';
 import Server from '../src/Server';
 import http from './__mocks__/http';
 import FrameUtil from '../src/FrameUtil';
 
 describe('Server receive message', () => {
   test('receive text message', () => {
+    const spy = sinon.spy();
     const server = new http.Server();
     const wss = new Server({server});
     wss.on('connection', (ws) => {
+      spy();
       ws.on('message', (message) => {
+        spy();
         expect(message.toString()).toBe(msg);
       })
     });
@@ -22,13 +26,17 @@ describe('Server receive message', () => {
       mask: true
     });
     socket.send(buf);
+    expect(spy.callCount).toBe(2);
   });
 
   test('receive binary message', () => {
+    const spy = sinon.spy();
     const server = new http.Server();
     const wss = new Server({server});
     wss.on('connection', (ws) => {
+      spy();
       ws.on('message', (message) => {
+        spy();
         expect(message).toEqual(binary);
       })
     });
@@ -42,6 +50,7 @@ describe('Server receive message', () => {
       mask: true
     })
     socket.send(buf);
+    expect(spy.callCount).toBe(2);
   });
 });
 

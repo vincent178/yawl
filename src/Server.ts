@@ -19,8 +19,9 @@ export type IServerOptions = {
 
 /*
  *  WebSocket Server class
+ *    * create a simple server if needed
  *    * handle upgrade request
- *    * receive data frame
+ *    * handshake
  * 
  *  TODO: <v1.0> websocket extensions
  */
@@ -72,8 +73,7 @@ export default class Server extends EventEmitter {
       const ws = new WebSocket(socket, head);
       this.emit('connection', ws);
       socket.on('data', buf => ws.onData(buf));
-      ws.on('error', () => {
-      });
+
     } else if (req.headers['sec-websocket-version'] !== '13') {
       this.abortHandShake(socket, 400, 'Sec-WebSocket-Version: 13');
     } else {

@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 
-export default class FrameUtil {
+export default class Util {
 
   static build(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean}) {
     const finfo = Buffer.allocUnsafe(2);
@@ -26,7 +26,7 @@ export default class FrameUtil {
     if (options.mask) {
       const mask = crypto.randomBytes(4);
       buf.push(mask);
-      const maskedData = FrameUtil.maskOrUnmask(mask, data);
+      const maskedData = Util.maskOrUnmask(mask, data);
       buf.push(maskedData);
     } else {
       buf.push(data);

@@ -1,7 +1,7 @@
-import * as stream from 'stream';
+import * as EventEmitter from 'events';
 import Util from './Util';
 
-export default class Receiver extends stream.Writable {
+export default class Receiver extends EventEmitter {
 
   private _fin: boolean;
   private _opcode: number;
@@ -17,9 +17,7 @@ export default class Receiver extends stream.Writable {
     this.resetAll();
   }
 
-  _write(chunk: Buffer, encoding: string, cb: Function) {
-    if (this._opcode === 0x08) return cb();
-
+  receive(chunk: Buffer) {
     this._buffers = this._buffers ? Buffer.concat([this._buffers, chunk]) : chunk;
 
     if (this._payloadLen === 0) {

@@ -3,6 +3,8 @@ import * as net from 'net';
 import Sender from './Sender';
 import Receiver from './Receiver';
 
+const CLOSE_TIMEOUT = 30 * 1000; // Allow 30 seconds to terminate the connection cleanly.
+
 /* 
  *  WebSocket class
  *    * parse data frame to message
@@ -14,27 +16,29 @@ import Receiver from './Receiver';
 export default class WebSocket extends EventEmitter {
 
   private _socket: net.Socket;
-  private _head: Buffer;
   private _sender: Sender;
   private _receiver: Receiver;
+  private _closeTimer: any;
 
   constructor(socket: net.Socket, head: Buffer) {
     super();
     this._socket = socket;
-    this._head = head;
     this._sender = new Sender(socket);
     this._receiver = new Receiver();
 
-    this._receiver.on('message', (message) => this.receiverOnMessage(message));
-    this._receiver.on('ping', () => this.receiverOnPing());
-    this._receiver.on('pong', () => this.receiverOnPong());
-    this._receiver.on('conclude', () => this.receiverOnConclude());
-    this._receiver.on('drain', () => this.receiverOnDrain());
+    this._receiver.on('message', this.receiverOnMessage);
+    this._receiver.on('ping', this.receiverOnPing);
+    this._receiver.on('pong', this.receiverOnPong);
+    this._receiver.on('close', this.receiverOnClose);
 
-    this._socket.on('close', () => this.socketOnClose());
-    this._socket.on('data', (buf) => this.socketOnData(buf));
-    this._socket.on('end', () => this.socketOnEnd());
-    this._socket.on('error', () => this.socketOnError());
+    if (typeof head !== 'undefined' && head.length > 0) {
+      socket.unshift(head);
+    }
+
+    this._socket.on('close', this.socketOnClose);
+    this._socket.on('data', this.socketOnData);
+
+    this.emit('open');
   }
 
   send(data: string|Buffer) {
@@ -53,34 +57,44 @@ export default class WebSocket extends EventEmitter {
     this._sender.close(code, reason);
   }
 
-  private receiverOnConclude() {
+  private receiverOnClose = (code?: number, reason?: string) => {
+    this.emitClose(code, reason);
+
+    this._sender.close(code, reason, (err: Error) => {
+      if (err) return;
+
+      this._closeTimer = setTimeout(() => this._socket.destroy(), CLOSE_TIMEOUT);
+    });
   }
 
-  private receiverOnDrain() {
-  }
-
-  private receiverOnMessage(message: Buffer|string) {
+  private receiverOnMessage = (message: Buffer|string) => {
     this.emit('message', message);
   }
 
-  private receiverOnPing() {
+  private receiverOnPing = (data: any) => {
+    this.emit('ping', data);
   }
 
-  private receiverOnPong() {
+  private receiverOnPong = (data: any) => {
+    this.emit('pong', data);
   }
 
-  private socketOnClose() {
+  private socketOnClose = () => {
+    this._socket.removeListener('close', this.socketOnClose);
+    this._socket = <any>null;
+
+    clearTimeout(this._closeTimer);
+
+    this.emitClose();
   }
 
-  private socketOnData(buf: Buffer) {
-    if (!this._receiver.write(buf)) {
-      this._socket.pause();
-    }
+  private socketOnData = (buf: Buffer) => {
+    this._receiver.receive(buf);
   }
 
-  private socketOnEnd() {
-  }
+  private emitClose(code?: number, reason?: string) {
+    this._receiver.removeAllListeners();
 
-  private socketOnError() {
+    this.emit('close', code, reason);
   }
 }

@@ -3,8 +3,7 @@ import net from './__mocks__/net';
 
 const socket = new net.Socket();
 
-const ws = new WebSocket(socket, null);
-
+// const ws = new WebSocket(socket, null);
 
 test('WebSocket consume', () => {
   // const data = 'Hello world';

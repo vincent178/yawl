@@ -2,7 +2,7 @@ import * as net from 'net';
 import Util from './Util';
 
 /*
- * FrameBuilder class
+ * Sender class
  *   * build textual frame
  *   * build binary frame
  *   * build other control frame
@@ -39,7 +39,7 @@ export default class Sender {
   }
 
   // send close frame
-  close(code?: number, reason?: string) {
+  close(code?: number, reason?: string, cb?: Function) {
     let data;
 
     if (code) {
@@ -52,11 +52,11 @@ export default class Sender {
         data.writeUInt16BE(code, 0);
       }
     }
-    this._send({data, opcode: 8, fin: true})
+    this._send({data, opcode: 8, fin: true, cb})
   }
 
   // generic method to build frame
-  private _send(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean}) {
-    this._socket.write(Util.frame(options));
+  private _send(options: {data?: string|Buffer|undefined, fin: boolean, opcode: number, mask?: boolean, cb?: Function}) {
+    this._socket.write(Util.frame(options), options.cb);
   }
 }
